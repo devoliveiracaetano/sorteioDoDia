@@ -1,18 +1,21 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
+  LineChart,
+  Line,
 } from "recharts";
 
 export default function Dashboard() {
-  // Dados fake das vendas (detalhes)
+  const navigate = useNavigate();
+
+  // Dados fake
   const [vendas] = useState([
     {
       vendedor: "João",
@@ -37,19 +40,14 @@ export default function Dashboard() {
     },
   ]);
 
-  // Dados fake de faturamento por mês
-  const [faturamentoMensal] = useState([
-    { mes: "Jan", valor: 120 },
-    { mes: "Fev", valor: 90 },
-    { mes: "Mar", valor: 150 },
-    { mes: "Abr", valor: 200 },
-    { mes: "Mai", valor: 300 },
-    { mes: "Jun", valor: 250 },
-    { mes: "Jul", valor: 400 },
-    { mes: "Ago", valor: 180 },
+  const [mensal] = useState([
+    { mes: "Abr", faturamento: 50 },
+    { mes: "Mai", faturamento: 70 },
+    { mes: "Jun", faturamento: 90 },
+    { mes: "Jul", faturamento: 40 },
+    { mes: "Ago", faturamento: 120 },
   ]);
 
-  // Cálculos
   const totalBilhetes = vendas.reduce((acc, v) => acc + v.qtd, 0);
   const faturamento = vendas.reduce((acc, v) => acc + v.valor, 0);
   const vendedoresUnicos = [...new Set(vendas.map((v) => v.vendedor))].length;
@@ -59,6 +57,11 @@ export default function Dashboard() {
     <div style={styles.container}>
       <h1>📊 Dashboard de Vendas</h1>
 
+      {/* Botão para Milhar */}
+      <button onClick={() => navigate("/milhar")} style={styles.button}>
+        🍀 Ir para Gerador de Milhar
+      </button>
+
       {/* Cards resumo */}
       <div style={styles.cards}>
         <div style={styles.card}>🎟️ Bilhetes: {totalBilhetes}</div>
@@ -67,7 +70,7 @@ export default function Dashboard() {
         <div style={styles.card}>🧑‍💼 Vendedores: {vendedoresUnicos}</div>
       </div>
 
-      {/* Gráfico Vendas por Vendedor */}
+      {/* Gráfico de vendas por vendedor */}
       <h2>Vendas por Vendedor</h2>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={vendas}>
@@ -79,20 +82,15 @@ export default function Dashboard() {
         </BarChart>
       </ResponsiveContainer>
 
-      {/* Gráfico Faturamento Mensal */}
+      {/* Gráfico de vendas mensais */}
       <h2>Faturamento dos Últimos Meses</h2>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={faturamentoMensal}>
+        <LineChart data={mensal}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="mes" />
           <YAxis />
           <Tooltip />
-          <Line
-            type="monotone"
-            dataKey="valor"
-            stroke="#8884d8"
-            strokeWidth={2}
-          />
+          <Line type="monotone" dataKey="faturamento" stroke="#8884d8" />
         </LineChart>
       </ResponsiveContainer>
 
@@ -128,6 +126,17 @@ const styles = {
   container: {
     padding: "2rem",
     fontFamily: "Arial, sans-serif",
+  },
+  button: {
+    marginBottom: "1rem",
+    padding: "0.7rem 1.5rem",
+    fontSize: "1rem",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#4caf50",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
   cards: {
     display: "grid",
