@@ -82,9 +82,20 @@ export default function Login() {
           </button>
         </form>
 
+        {/* 🔹 Alterado aqui: agora o link chama navigate */}
         <p style={styles.linkText}>
-          Não tem uma conta? <a href="#">Cadastre-se</a>
+          Não tem uma conta?{" "}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate("/cadastro-cliente");
+            }}
+          >
+            Cadastre-se
+          </a>
         </p>
+
         <p style={styles.linkText}>
           <a href="#">Esqueceu sua senha?</a>
         </p>
