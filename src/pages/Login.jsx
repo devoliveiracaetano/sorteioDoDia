@@ -22,7 +22,12 @@ export default function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    navigate("/dashboard");
+
+    if (email === "admin@teste.com") {
+      navigate("/dashboard/admin");
+    } else {
+      navigate("/dashboard/vendedor");
+    }
   };
 
   const handleNovaSorte = () => {
@@ -35,9 +40,10 @@ export default function Login() {
     <div style={styles.container}>
       {/* Cartão de Login */}
       <div style={styles.card}>
-        <h2>Sorte do Dia 🍀</h2>
+        <h2>🎟️ Sorte do Dia</h2>
         <img src={trevoImg} alt="Trevo" style={styles.logo} />
         <h2>Login</h2>
+
         <form onSubmit={handleLogin} style={styles.form}>
           <div style={styles.inputGroup}>
             <MdEmail style={styles.icon} />
@@ -90,7 +96,7 @@ export default function Login() {
 
       {/* Cartão Sorte do Dia */}
       <div style={styles.sorteCard}>
-        <h2>Sorte do Dia 🍀</h2>
+        <h2>🍀 Sua Sorte</h2>
         <img src={jogarImg} alt="Jogar" style={styles.sorteImage} />
         <p style={styles.sorteText}>{sorte}</p>
         <button onClick={handleNovaSorte} style={styles.button}>
@@ -150,9 +156,12 @@ const styles = {
     padding: "0.5rem",
     borderRadius: "4px",
     border: "none",
+    backgroundColor: "#4caf50",
     color: "#fff",
     fontSize: "1rem",
     marginTop: "0.5rem",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
   sorteCard: {
     padding: "2rem",
