@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MdEmail, MdLock } from "react-icons/md"; // Ícones
+import { MdEmail, MdLock } from "react-icons/md";
 import trevoImg from "../assets/trevo.jpg";
 import jogarImg from "../assets/jogar.png";
 
@@ -22,26 +22,23 @@ export default function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    console.log("Email:", email, "Senha:", password);
     navigate("/dashboard");
   };
+
+  const handleNovaSorte = () => {
+    setSorte(generateSorte());
+  };
+
+  const isFormValid = email.trim() !== "" && password.trim() !== "";
 
   return (
     <div style={styles.container}>
       {/* Cartão de Login */}
       <div style={styles.card}>
-        <h2>Sorte do Dia 🍀</h2> {/* 🔹 Agora fica acima do trevo */}
+        <h2>Sorte do Dia 🍀</h2>
         <img src={trevoImg} alt="Trevo" style={styles.logo} />
         <h2>Login</h2>
-        {/* Não tem conta */}
-        <p style={styles.smallText}>
-          Não tem uma conta?{" "}
-          <a href="/register" style={styles.link}>
-            Cadastre-se
-          </a>
-        </p>
         <form onSubmit={handleLogin} style={styles.form}>
-          {/* Input Email com ícone */}
           <div style={styles.inputGroup}>
             <MdEmail style={styles.icon} />
             <input
@@ -54,7 +51,6 @@ export default function Login() {
             />
           </div>
 
-          {/* Input Senha com ícone */}
           <div style={styles.inputGroup}>
             <MdLock style={styles.icon} />
             <input
@@ -67,39 +63,37 @@ export default function Login() {
             />
           </div>
 
-          <button type="submit" style={styles.button}>
+          <button
+            type="submit"
+            style={{
+              ...styles.button,
+              backgroundColor: isFormValid ? "#4caf50" : "#aaa",
+              cursor: isFormValid ? "pointer" : "not-allowed",
+            }}
+            disabled={!isFormValid}
+          >
             Entrar
           </button>
         </form>
-        {/* Link de esqueci senha */}
-        <div style={styles.links}>
-          <p>
-            <a href="/forgot-password" style={styles.link}>
-              Esqueceu sua senha?
-            </a>
-          </p>
-        </div>
-        {/* Footer */}
-        <footer style={styles.footer}>
-          <p>
-            <a href="/terms" style={styles.link}>
-              Termos do Serviço
-            </a>{" "}
-            |{" "}
-            <a href="/privacy" style={styles.link}>
-              Política de Privacidade
-            </a>
-          </p>
-          <p>© {new Date().getFullYear()} Sorte do Dia</p>
-        </footer>
+
+        <p style={styles.linkText}>
+          Não tem uma conta? <a href="#">Cadastre-se</a>
+        </p>
+        <p style={styles.linkText}>
+          <a href="#">Esqueceu sua senha?</a>
+        </p>
+        <p style={styles.footer}>
+          © 2025 Minha Empresa · <a href="#">Termos do Serviço</a> ·{" "}
+          <a href="#">Política de Privacidade</a>
+        </p>
       </div>
 
       {/* Cartão Sorte do Dia */}
-      <div style={styles.card}>
+      <div style={styles.sorteCard}>
         <h2>Sorte do Dia 🍀</h2>
         <img src={jogarImg} alt="Jogar" style={styles.sorteImage} />
         <p style={styles.sorteText}>{sorte}</p>
-        <button onClick={() => setSorte(generateSorte())} style={styles.button}>
+        <button onClick={handleNovaSorte} style={styles.button}>
           Nova Sorte
         </button>
       </div>
@@ -107,34 +101,28 @@ export default function Login() {
   );
 }
 
-// Estilos
-const baseCard = {
-  padding: "2rem",
-  borderRadius: "8px",
-  backgroundColor: "#fff",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-  textAlign: "center",
-  width: "300px",
-};
-
+// Estilos inline
 const styles = {
   container: {
     display: "flex",
     justifyContent: "center",
-    alignItems: "flex-start",
-    minHeight: "100vh",
+    alignItems: "center",
+    height: "100vh",
     backgroundColor: "#f0f2f5",
     gap: "2rem",
     padding: "1rem",
-    flexWrap: "wrap", // Responsivo
+    flexWrap: "wrap",
   },
   card: {
-    ...baseCard,
-    flex: "1 1 300px",
+    padding: "2rem",
+    borderRadius: "8px",
+    backgroundColor: "#fff",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    textAlign: "center",
+    width: "300px",
   },
   logo: {
-    width: "120px",
-    height: "auto",
+    width: "80px",
     marginBottom: "1rem",
   },
   form: {
@@ -145,57 +133,50 @@ const styles = {
   inputGroup: {
     display: "flex",
     alignItems: "center",
-    border: "1px solid #ccc",
+    gap: "0.5rem",
+  },
+  input: {
+    flex: 1,
+    padding: "0.5rem",
     borderRadius: "4px",
-    padding: "0.3rem 0.5rem",
-    backgroundColor: "#fff",
+    border: "1px solid #ccc",
+    fontSize: "1rem",
   },
   icon: {
     fontSize: "1.2rem",
     color: "#666",
-    marginRight: "0.5rem",
-  },
-  input: {
-    flex: 1,
-    border: "none",
-    outline: "none",
-    fontSize: "1rem",
   },
   button: {
     padding: "0.5rem",
     borderRadius: "4px",
     border: "none",
-    backgroundColor: "#4caf50",
     color: "#fff",
     fontSize: "1rem",
-    cursor: "pointer",
     marginTop: "0.5rem",
   },
-  smallText: {
-    fontSize: "0.9rem",
-    margin: "0.5rem 0 1.5rem 0",
-    color: "#555",
-  },
-  links: {
-    marginTop: "1rem",
-    fontSize: "0.9rem",
-  },
-  link: {
-    color: "#4caf50",
-    textDecoration: "none",
-  },
-  footer: {
-    marginTop: "2rem",
-    fontSize: "0.8rem",
-    color: "#666",
+  sorteCard: {
+    padding: "2rem",
+    borderRadius: "8px",
+    backgroundColor: "#fff",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    textAlign: "center",
+    width: "300px",
   },
   sorteText: {
     fontSize: "1.2rem",
     margin: "1rem 0",
   },
   sorteImage: {
-    width: "120px",
-    height: "auto",
+    width: "100px",
     margin: "1rem 0",
+  },
+  linkText: {
+    fontSize: "0.9rem",
+    marginTop: "0.5rem",
+  },
+  footer: {
+    marginTop: "1rem",
+    fontSize: "0.8rem",
+    color: "#777",
   },
 };
