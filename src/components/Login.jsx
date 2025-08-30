@@ -30,9 +30,9 @@ export default function Login() {
     <div style={styles.container}>
       {/* Cartão de Login */}
       <div style={styles.card}>
+        <h2>Sorte do Dia 🍀</h2> {/* 🔹 Agora fica acima do trevo */}
         <img src={trevoImg} alt="Trevo" style={styles.logo} />
         <h2>Login</h2>
-
         {/* Não tem conta */}
         <p style={styles.smallText}>
           Não tem uma conta?{" "}
@@ -40,7 +40,6 @@ export default function Login() {
             Cadastre-se
           </a>
         </p>
-
         <form onSubmit={handleLogin} style={styles.form}>
           {/* Input Email com ícone */}
           <div style={styles.inputGroup}>
@@ -72,7 +71,6 @@ export default function Login() {
             Entrar
           </button>
         </form>
-
         {/* Link de esqueci senha */}
         <div style={styles.links}>
           <p>
@@ -81,7 +79,6 @@ export default function Login() {
             </a>
           </p>
         </div>
-
         {/* Footer */}
         <footer style={styles.footer}>
           <p>
