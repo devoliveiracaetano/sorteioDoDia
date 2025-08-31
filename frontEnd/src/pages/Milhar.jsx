@@ -257,9 +257,6 @@ export default function Milhar() {
           {pagamentos.map((p, i) => (
             <div key={i} style={styles.bilheteCard}>
               <span>
-                <strong>Txid:</strong> {p.txid}
-              </span>
-              <span>
                 <strong>Cliente:</strong> {p.cliente}
               </span>
               <span>
