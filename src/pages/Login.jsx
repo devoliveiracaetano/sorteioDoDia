@@ -24,9 +24,9 @@ export default function Login() {
     e.preventDefault();
 
     if (email === "admin@teste.com") {
-      navigate("/dashboard/admin");
+      navigate("/menu", { state: { role: "admin" } });
     } else {
-      navigate("/dashboard/vendedor");
+      navigate("/menu", { state: { role: "vendedor" } });
     }
   };
 
@@ -82,7 +82,6 @@ export default function Login() {
           </button>
         </form>
 
-        {/* 🔹 Alterado aqui: agora o link chama navigate */}
         <p style={styles.linkText}>
           Não tem uma conta?{" "}
           <a
