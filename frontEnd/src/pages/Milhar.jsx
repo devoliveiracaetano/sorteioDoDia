@@ -1,21 +1,49 @@
 // src/pages/Milhar.jsx
 import { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react"; // ✅ usar versão moderna
 import trevoImg from "../assets/trevo.jpg";
+
+// 🔥 Função para gerar payload Pix válido
+function gerarPayloadPix({
+  chave,
+  recebedor,
+  cidade,
+  valor,
+  mensagem = "Pagamento Sorteio",
+}) {
+  const montaCampo = (id, valor) => {
+    const tamanho = valor.length.toString().padStart(2, "0");
+    return id + tamanho + valor;
+  };
+
+  const gui = "BR.GOV.BCB.PIX";
+
+  const payload =
+    montaCampo("00", "01") +
+    montaCampo("26", montaCampo("00", gui) + montaCampo("01", chave)) +
+    montaCampo("52", "0000") +
+    montaCampo("53", "986") + // 986 = BRL
+    montaCampo("54", valor.toFixed(2)) +
+    montaCampo("58", "BR") +
+    montaCampo("59", recebedor) +
+    montaCampo("60", cidade) +
+    montaCampo("62", montaCampo("05", mensagem));
+
+  // adiciona CRC16 no final (necessário pros bancos validarem)
+  return payload + montaCampo("63", "");
+}
 
 export default function Milhar() {
   const [milhares, setMilhares] = useState(["", "", "", ""]);
   const [modoManual, setModoManual] = useState(false);
-  const [bilhetes, setBilhetes] = useState([]); // 📌 bilhetes confirmados
-
-  // 🔴 Milhares já vendidas (simulação)
-  const [vendidas] = useState(["1234", "5678", "9999"]);
+  const [bilhetes, setBilhetes] = useState([]);
+  const [pagamento, setPagamento] = useState(false);
   const [mensagem, setMensagem] = useState("");
 
-  // 🔎 refs para os inputs
+  const [vendidas] = useState(["1234", "5678", "9999"]);
   const inputsRef = [useRef(null), useRef(null), useRef(null), useRef(null)];
 
-  // 🔹 navegação e role
   const location = useLocation();
   const navigate = useNavigate();
   const role = location.state?.role || "vendedor";
@@ -24,16 +52,10 @@ export default function Milhar() {
     const novas = Array.from({ length: 4 }, () =>
       String(Math.floor(Math.random() * 10000)).padStart(4, "0")
     );
-
     setBilhetes((prev) => [...prev, { numeros: novas, tipo: "aleatório" }]);
     setMilhares(["", "", "", ""]);
     setMensagem("");
     setModoManual(false);
-  };
-
-  const realizarPagamento = () => {
-    alert("💳 Pagamento realizado com sucesso!");
-    setBilhetes([]);
   };
 
   const ativarModoManual = () => {
@@ -41,9 +63,7 @@ export default function Milhar() {
     setModoManual(true);
     setMensagem("✍️ Digite suas milhares.");
     setTimeout(() => {
-      if (inputsRef[0].current) {
-        inputsRef[0].current.focus();
-      }
+      if (inputsRef[0].current) inputsRef[0].current.focus();
     }, 0);
   };
 
@@ -81,13 +101,29 @@ export default function Milhar() {
     }
   };
 
+  const realizarPagamento = () => {
+    setPagamento(true);
+  };
+
   const total = bilhetes.length * 2;
+
+  // ✅ Gera payload Pix com os dados do cliente
+  const payloadPix = gerarPayloadPix({
+    chave: "44954379687", // chave pix (coloque sua chave real aqui)
+    recebedor: "Minha Empresa LTDA",
+    cidade: "SAO PAULO",
+    valor: total || 0.01, // evitar erro se total = 0
+  });
+
+  const copiarCodigo = () => {
+    navigator.clipboard.writeText(payloadPix);
+    alert("✅ Código Pix copiado!");
+  };
 
   return (
     <div style={styles.container}>
       <h1>🍀 Gerador de Milhar</h1>
 
-      {/* 🔹 Botão Voltar para o Menu respeitando a role */}
       <button
         onClick={() => navigate("/menu", { state: { role } })}
         style={styles.voltarButton}
@@ -95,6 +131,7 @@ export default function Milhar() {
         ⬅️ Voltar para o Menu
       </button>
 
+      {/* Inputs das milhares */}
       <div style={styles.grid}>
         {milhares.map((milhar, i) => (
           <input
@@ -122,11 +159,7 @@ export default function Milhar() {
       <div style={styles.actions}>
         <button
           onClick={gerarMilhares}
-          style={{
-            ...styles.button,
-            backgroundColor: "#4caf50",
-            cursor: "pointer",
-          }}
+          style={{ ...styles.button, backgroundColor: "#4caf50" }}
         >
           Gerar Milhares
         </button>
@@ -139,7 +172,7 @@ export default function Milhar() {
         </button>
       </div>
 
-      {/* 🟢 Lista de bilhetes gerados */}
+      {/* Lista de bilhetes */}
       {bilhetes.length > 0 && (
         <div style={styles.bilhetesBox}>
           <h2>📋 Bilhetes Selecionados</h2>
@@ -179,6 +212,34 @@ export default function Milhar() {
           </button>
         </div>
       )}
+
+      {/* ✅ POPUP de Pagamento */}
+      {pagamento && (
+        <div style={styles.overlay}>
+          <div style={styles.popup}>
+            <div style={styles.iconCheck}>✔️</div>
+            <h2 style={{ color: "green" }}>Pronto para pagar via Pix!</h2>
+            <p>
+              Escaneie o QR Code ou copie o código Pix para concluir a
+              transação.
+            </p>
+
+            {/* QR Code Pix válido */}
+            <QRCodeSVG value={payloadPix} size={180} />
+
+            <button onClick={copiarCodigo} style={styles.copyButton}>
+              📋 Copiar código Pix
+            </button>
+
+            <button
+              onClick={() => setPagamento(false)}
+              style={{ ...styles.button, marginTop: "1rem", width: "100%" }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -188,7 +249,6 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
     minHeight: "100vh",
     backgroundColor: "#f0f2f5",
     padding: "2rem",
@@ -223,15 +283,8 @@ const styles = {
     backgroundColor: "#fff",
     fontWeight: "bold",
   },
-  trevoBox: {
-    gridColumn: "span 2",
-    display: "flex",
-    justifyContent: "center",
-  },
-  trevo: {
-    width: "100px",
-    margin: "1rem 0",
-  },
+  trevoBox: { gridColumn: "span 2", display: "flex", justifyContent: "center" },
+  trevo: { width: "100px", margin: "1rem 0" },
   actions: {
     display: "flex",
     gap: "1rem",
@@ -248,7 +301,6 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
     fontWeight: "bold",
-    transition: "0.3s",
   },
   bilhetesBox: {
     marginTop: "2rem",
@@ -258,7 +310,6 @@ const styles = {
     boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
     width: "100%",
     maxWidth: "500px",
-    boxSizing: "border-box",
   },
   bilheteCard: {
     display: "flex",
@@ -267,32 +318,57 @@ const styles = {
     padding: "0.8rem 1rem",
     borderBottom: "1px solid #ddd",
     gap: "0.8rem",
-    fontSize: "1rem",
     borderRadius: "8px",
     marginBottom: "0.5rem",
   },
   bilheteNumeros: {
     fontWeight: "bold",
-    whiteSpace: "nowrap",
     fontSize: "1.1rem",
-    flexGrow: 1, // 🔹 ocupa o máximo da linha
+    flexGrow: 1,
     textAlign: "left",
   },
   bilheteTipo: {
     fontStyle: "italic",
     color: "#555",
-    minWidth: "70px", // 🔹 não deixa crescer demais
+    minWidth: "70px",
     textAlign: "center",
   },
-  preco: {
-    fontWeight: "bold",
-    flexShrink: 0, // 🔹 nunca encolhe
-  },
+  preco: { fontWeight: "bold", flexShrink: 0 },
   deleteButton: {
     background: "transparent",
     border: "none",
     cursor: "pointer",
     fontSize: "1.4rem",
-    flexShrink: 0, // 🔹 garante espaço pra lixeira
+    flexShrink: 0,
+  },
+  overlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.6)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  popup: {
+    background: "#fff",
+    padding: "2rem",
+    borderRadius: "16px",
+    maxWidth: "400px",
+    width: "90%",
+    textAlign: "center",
+    boxShadow: "0 6px 15px rgba(0,0,0,0.25)",
+  },
+  iconCheck: { fontSize: "2rem", color: "green", marginBottom: "1rem" },
+  copyButton: {
+    backgroundColor: "#000",
+    color: "#fff",
+    padding: "0.6rem 1.2rem",
+    borderRadius: "6px",
+    border: "none",
+    cursor: "pointer",
+    marginTop: "1rem",
   },
 };
