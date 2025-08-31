@@ -1,6 +1,4 @@
-// src/pages/Menu.jsx
 import { useLocation, useNavigate } from "react-router-dom";
-import trevoImg from "../assets/trevo.jpg"; // ✅ Importando a imagem do trevo
 
 export default function Menu() {
   const location = useLocation();
@@ -15,15 +13,18 @@ export default function Menu() {
       <p>Bem-vindo, {role === "admin" ? "Administrador" : "Vendedor"}!</p>
 
       <div style={styles.buttonGroup}>
-        {/* Dashboard para cada perfil */}
-        {role === "admin" ? (
+        {/* 🔹 Se for ADMIN mostra Dashboard Admin */}
+        {role === "admin" && (
           <button
             style={styles.button}
             onClick={() => navigate("/dashboard-admin", { state: { role } })}
           >
             📊 Dashboard
           </button>
-        ) : (
+        )}
+
+        {/* 🔹 Se for VENDEDOR mostra Dashboard Vendedor */}
+        {role === "vendedor" && (
           <button
             style={styles.button}
             onClick={() => navigate("/dashboard-vendedor", { state: { role } })}
@@ -32,13 +33,12 @@ export default function Menu() {
           </button>
         )}
 
-        {/* Botão Gerador de Milhar com ícone do trevo */}
+        {/* Botão comum para ambos */}
         <button
           style={styles.button}
           onClick={() => navigate("/milhar", { state: { role } })}
         >
-          <img src={trevoImg} alt="Trevo" style={styles.icon} /> Gerador de
-          Milhar
+          🍀 Gerador de Milhar
         </button>
 
         <button
@@ -48,16 +48,19 @@ export default function Menu() {
           🧑‍💻 Cadastro de Cliente
         </button>
 
-        {/* Botão exclusivo do admin */}
+        {/* 🔹 Botão exclusivo do Admin */}
         {role === "admin" && (
           <button
             style={styles.button}
-            onClick={() => navigate("/cadastro-admin", { state: { role } })}
+            onClick={() =>
+              navigate("/cadastro-administrador", { state: { role } })
+            }
           >
             🛠️ Cadastrar Administrador
           </button>
         )}
 
+        {/* Sair */}
         <button
           style={{ ...styles.button, background: "#e74c3c" }}
           onClick={() => navigate("/")}
@@ -92,13 +95,5 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
     transition: "0.3s",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.5rem",
-  },
-  icon: {
-    width: "20px",
-    height: "20px",
   },
 };

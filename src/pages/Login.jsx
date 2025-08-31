@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdEmail, MdLock } from "react-icons/md";
 import trevoImg from "../assets/trevo.jpg";
@@ -19,6 +19,12 @@ export default function Login() {
     ];
     return frases[Math.floor(Math.random() * frases.length)];
   }
+
+  // 🔹 Sempre que entrar na tela de login, limpar os inputs
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+  }, []);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -81,19 +87,6 @@ export default function Login() {
             Entrar
           </button>
         </form>
-
-        <p style={styles.linkText}>
-          Não tem uma conta?{" "}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate("/cadastro-cliente");
-            }}
-          >
-            Cadastre-se
-          </a>
-        </p>
 
         <p style={styles.linkText}>
           <a href="#">Esqueceu sua senha?</a>
