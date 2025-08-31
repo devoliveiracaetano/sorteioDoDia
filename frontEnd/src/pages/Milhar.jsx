@@ -54,7 +54,7 @@ function gerarPixPayload({ chave, nome, cidade, identificador, valor }) {
     formatEMV("53", "986");
 
   if (valor && valor > 0) {
-    payload += formatEMV("54", Number(valor).toFixed(2)); // ✅ sempre com 2 casas
+    payload += formatEMV("54", Number(valor).toFixed(2));
   }
 
   payload +=
@@ -75,8 +75,9 @@ export default function Milhar() {
   const [bilhetes, setBilhetes] = useState([]);
   const [pagamento, setPagamento] = useState(false);
   const [pixPayload, setPixPayload] = useState("");
-
-  const [showMessage, setShowMessage] = useState(false); // ✅ estado da mensagem
+  const [txidAtual, setTxidAtual] = useState("");
+  const [showMessage, setShowMessage] = useState(false);
+  const [pagamentos, setPagamentos] = useState([]);
 
   const [vendidas] = useState(["1234", "5678", "9999"]);
   const inputsRef = [useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -84,6 +85,7 @@ export default function Milhar() {
   const location = useLocation();
   const navigate = useNavigate();
   const role = location.state?.role || "vendedor";
+  const cliente = location.state?.cliente || "Cliente não informado";
 
   const gerarMilhares = () => {
     const novas = Array.from({ length: 4 }, () =>
@@ -138,6 +140,7 @@ export default function Milhar() {
     });
 
     setPixPayload(payload);
+    setTxidAtual(txid);
     setPagamento(true);
   };
 
@@ -145,14 +148,36 @@ export default function Milhar() {
     if (!pixPayload) return;
     navigator.clipboard.writeText(pixPayload);
 
-    // ✅ mostra mensagem por 7s
     setShowMessage(true);
     setTimeout(() => setShowMessage(false), 7000);
+  };
+
+  const fecharPagamento = () => {
+    setPagamento(false);
+
+    if (total > 0) {
+      setPagamentos((prev) => [
+        ...prev,
+        {
+          txid: txidAtual,
+          valor: total,
+          cliente,
+          status: "Aguardando pagamento do Pix",
+        },
+      ]);
+    }
+
+    setBilhetes([]);
   };
 
   return (
     <div style={styles.container}>
       <h1>🍀 Gerador de Milhar</h1>
+
+      {/* 🔹 Mostra cliente selecionado */}
+      <h3 style={{ color: "#2c3e50", marginBottom: "1rem" }}>
+        Cliente: <span style={{ color: "#27ae60" }}>{cliente}</span>
+      </h3>
 
       <button
         onClick={() => navigate("/menu", { state: { role } })}
@@ -225,35 +250,54 @@ export default function Milhar() {
         </div>
       )}
 
+      {/* ✅ Histórico de pagamentos com cliente */}
+      {pagamentos.length > 0 && (
+        <div style={{ ...styles.bilhetesBox, marginTop: "1.5rem" }}>
+          <h2>💳 Pagamentos</h2>
+          {pagamentos.map((p, i) => (
+            <div key={i} style={styles.bilheteCard}>
+              <span>
+                <strong>Txid:</strong> {p.txid}
+              </span>
+              <span>
+                <strong>Cliente:</strong> {p.cliente}
+              </span>
+              <span>
+                <strong>Valor:</strong> R$ {p.valor.toFixed(2)}
+              </span>
+              <span style={{ color: "#d35400", fontWeight: "bold" }}>
+                {p.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {pagamento && (
         <div style={styles.overlay}>
           <div style={styles.popup}>
+            {showMessage && (
+              <div style={styles.messageBox}>
+                <strong>✅ Código Pix copiado com sucesso!</strong>
+                <br />
+                Agora é só abrir o app do seu banco e usar a opção{" "}
+                <em>"Pix Copia e Cola"</em>.
+              </div>
+            )}
+
             <div style={styles.header}>
               <div style={styles.iconCircle}>
                 <span className="checkmark">✔</span>
               </div>
-
-              {/* ✅ mensagem aparece logo acima do título */}
-              {showMessage && (
-                <div style={styles.messageBox}>
-                  <strong>✅ Código Pix copiado com sucesso!</strong>
-                  <br />
-                  Abra o app do banco e use a opção <em>
-                    "Pix Copia e Cola"
-                  </em>{" "}
-                  para finalizar o pagamento.
-                </div>
-              )}
-
               <h2 style={styles.title}>Pronto para digitalizar!</h2>
               <p style={styles.subtitle}>
-                Use o código QR para prosseguir com a transação. <br />
-                Quando a transação for concluída, você receberá uma notificação.
+                Use o QR Code abaixo para pagar. <br />
+                Ao concluir, o pagamento será confirmado.
               </p>
             </div>
 
             <div style={{ margin: "1.5rem 0" }}>
-              <QRCodeSVG value={pixPayload} size={260} includeMargin />
+              <QRCodeSVG value={pixPayload} size={220} includeMargin />
             </div>
 
             <button onClick={copiarCodigo} style={styles.copyButton}>
@@ -261,7 +305,7 @@ export default function Milhar() {
             </button>
 
             <button
-              onClick={() => setPagamento(false)}
+              onClick={fecharPagamento}
               style={{ ...styles.button, marginTop: "1.2rem", width: "100%" }}
             >
               Fechar
@@ -301,12 +345,12 @@ const styles = {
     textAlign: "center",
   },
   messageBox: {
-    background: "#b2f2bb", // ✅ verde claro discreto
+    background: "#b2f2bb",
     color: "#033a1a",
     padding: "0.6rem 1rem",
     borderRadius: "8px",
     fontSize: "0.85rem",
-    margin: "0.8rem 0", // espaçamento em cima e embaixo
+    marginBottom: "1rem",
     textAlign: "center",
   },
   voltarButton: {
@@ -368,7 +412,7 @@ const styles = {
   },
   bilheteCard: {
     display: "grid",
-    gridTemplateColumns: "1fr auto auto auto",
+    gridTemplateColumns: "1fr auto auto",
     alignItems: "center",
     gap: "0.8rem",
     padding: "0.8rem 0",
