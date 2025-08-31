@@ -153,7 +153,7 @@ export default function Milhar() {
             >
               <span style={styles.bilheteNumeros}>{b.numeros.join(" - ")}</span>
               <span style={styles.bilheteTipo}>{b.tipo}</span>
-              <strong>R$ 2,00</strong>
+              <strong style={styles.preco}>R$ 2,00</strong>
               <button
                 onClick={() => removerBilhete(i)}
                 style={styles.deleteButton}
@@ -236,6 +236,8 @@ const styles = {
     display: "flex",
     gap: "1rem",
     marginTop: "1rem",
+    flexWrap: "wrap",
+    justifyContent: "center",
   },
   button: {
     padding: "0.7rem 1.5rem",
@@ -254,31 +256,43 @@ const styles = {
     background: "#fff",
     borderRadius: "16px",
     boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-    width: "500px",
+    width: "100%",
+    maxWidth: "500px",
+    boxSizing: "border-box",
   },
   bilheteCard: {
-    display: "grid",
-    gridTemplateColumns: "1fr auto auto auto",
+    display: "flex",
     alignItems: "center",
+    justifyContent: "space-between",
     padding: "0.8rem 1rem",
     borderBottom: "1px solid #ddd",
     gap: "0.8rem",
-    fontSize: "1.2rem",
+    fontSize: "1rem",
     borderRadius: "8px",
     marginBottom: "0.5rem",
   },
   bilheteNumeros: {
     fontWeight: "bold",
     whiteSpace: "nowrap",
+    fontSize: "1.1rem",
+    flexGrow: 1, // 🔹 ocupa o máximo da linha
+    textAlign: "left",
   },
   bilheteTipo: {
     fontStyle: "italic",
     color: "#555",
+    minWidth: "70px", // 🔹 não deixa crescer demais
+    textAlign: "center",
+  },
+  preco: {
+    fontWeight: "bold",
+    flexShrink: 0, // 🔹 nunca encolhe
   },
   deleteButton: {
     background: "transparent",
     border: "none",
     cursor: "pointer",
     fontSize: "1.4rem",
+    flexShrink: 0, // 🔹 garante espaço pra lixeira
   },
 };
