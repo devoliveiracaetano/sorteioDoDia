@@ -1,4 +1,6 @@
+// src/pages/Milhar.jsx
 import { useState, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import trevoImg from "../assets/trevo.jpg";
 
 export default function Milhar() {
@@ -13,15 +15,17 @@ export default function Milhar() {
   // 🔎 refs para os inputs
   const inputsRef = [useRef(null), useRef(null), useRef(null), useRef(null)];
 
+  // 🔹 navegação e role
+  const location = useLocation();
+  const navigate = useNavigate();
+  const role = location.state?.role || "vendedor";
+
   const gerarMilhares = () => {
     const novas = Array.from({ length: 4 }, () =>
       String(Math.floor(Math.random() * 10000)).padStart(4, "0")
     );
 
-    // adiciona bilhete como aleatório
     setBilhetes((prev) => [...prev, { numeros: novas, tipo: "aleatório" }]);
-
-    // limpa os inputs e mantém desabilitados
     setMilhares(["", "", "", ""]);
     setMensagem("");
     setModoManual(false);
@@ -36,7 +40,6 @@ export default function Milhar() {
     setMilhares(["", "", "", ""]);
     setModoManual(true);
     setMensagem("✍️ Digite suas milhares.");
-    // 👉 coloca o foco no primeiro input
     setTimeout(() => {
       if (inputsRef[0].current) {
         inputsRef[0].current.focus();
@@ -45,12 +48,11 @@ export default function Milhar() {
   };
 
   const atualizarMilhar = (valor, index) => {
-    if (!/^\d{0,4}$/.test(valor)) return; // só números até 4 dígitos
+    if (!/^\d{0,4}$/.test(valor)) return;
     const novas = [...milhares];
     novas[index] = valor;
     setMilhares(novas);
 
-    // 🔎 verifica milhares vendidas a cada digitação
     const vendidasEncontradas = novas.filter(
       (m) => m.length === 4 && vendidas.includes(m)
     );
@@ -61,16 +63,14 @@ export default function Milhar() {
       setMensagem("✍️ Continue digitando suas milhares.");
     }
 
-    // 👉 se completou 4 dígitos, pula para o próximo input
     if (valor.length === 4 && index < inputsRef.length - 1) {
       inputsRef[index + 1].current.focus();
     }
 
-    // 📌 quando todas estiverem preenchidas, adiciona bilhete manual
     const todasPreenchidas = novas.every((m) => m.length === 4);
     if (todasPreenchidas && vendidasEncontradas.length === 0) {
       setBilhetes((prev) => [...prev, { numeros: novas, tipo: "manual" }]);
-      setMilhares(["", "", "", ""]); // limpa os inputs p/ próximo bilhete
+      setMilhares(["", "", "", ""]);
       if (inputsRef[0].current) inputsRef[0].current.focus();
     }
   };
@@ -86,6 +86,14 @@ export default function Milhar() {
   return (
     <div style={styles.container}>
       <h1>🍀 Gerador de Milhar</h1>
+
+      {/* 🔹 Botão Voltar para o Menu respeitando a role */}
+      <button
+        onClick={() => navigate("/menu", { state: { role } })}
+        style={styles.voltarButton}
+      >
+        ⬅️ Voltar para o Menu
+      </button>
 
       <div style={styles.grid}>
         {milhares.map((milhar, i) => (
@@ -140,7 +148,7 @@ export default function Milhar() {
               key={i}
               style={{
                 ...styles.bilheteCard,
-                backgroundColor: b.tipo === "manual" ? "#e8f5e9" : "#e3f2fd", // cor diferente
+                backgroundColor: b.tipo === "manual" ? "#e8f5e9" : "#e3f2fd",
               }}
             >
               <span style={styles.bilheteNumeros}>{b.numeros.join(" - ")}</span>
@@ -156,7 +164,6 @@ export default function Milhar() {
           ))}
           <h3>Total: R$ {total.toFixed(2)}</h3>
 
-          {/* 🔵 Botão de pagamento agora no final */}
           <button
             onClick={realizarPagamento}
             style={{
@@ -186,6 +193,17 @@ const styles = {
     backgroundColor: "#f0f2f5",
     padding: "2rem",
     textAlign: "center",
+  },
+  voltarButton: {
+    marginBottom: "1rem",
+    padding: "0.7rem 1.5rem",
+    fontSize: "1rem",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#9e9e9e",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
   grid: {
     display: "grid",
@@ -251,7 +269,7 @@ const styles = {
   },
   bilheteNumeros: {
     fontWeight: "bold",
-    whiteSpace: "nowrap", // garante que fica tudo em uma linha
+    whiteSpace: "nowrap",
   },
   bilheteTipo: {
     fontStyle: "italic",
