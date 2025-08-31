@@ -4,60 +4,80 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import trevoImg from "../assets/trevo.jpg";
 
-// 🔑 Função para formatar campo EMV
-function formatEMV(id, value) {
-  const length = String(value.length).padStart(2, "0");
-  return id + length + value;
+/* ================= Helpers PIX ================= */
+
+// Remove acentos e caracteres não-ASCII básicos
+function sanitize(text) {
+  return (text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9 ]/g, "")
+    .toUpperCase();
 }
 
-// 🔑 Cálculo CRC16 para Pix
-function crc16(payload) {
-  let polinomio = 0x1021;
-  let resultado = 0xffff;
+// Formata campo EMV: ID + len(2) + valor
+function formatEMV(id, value) {
+  const val = String(value ?? "");
+  const length = String(val.length).padStart(2, "0");
+  return id + length + val;
+}
 
+// CRC16-CCITT (0x1021), init 0xFFFF
+function crc16(payload) {
+  let crc = 0xffff;
   for (let i = 0; i < payload.length; i++) {
-    resultado ^= payload.charCodeAt(i) << 8;
+    crc ^= payload.charCodeAt(i) << 8;
     for (let j = 0; j < 8; j++) {
-      if ((resultado <<= 1) & 0x10000) resultado ^= polinomio;
-      resultado &= 0xffff;
+      if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
+      else crc <<= 1;
+      crc &= 0xffff;
     }
   }
-
-  return resultado.toString(16).toUpperCase().padStart(4, "0");
+  return crc.toString(16).toUpperCase().padStart(4, "0");
 }
 
-// 🔑 Gerador do payload Pix dinâmico
+/**
+ * Gera payload Pix ESTÁTICO (Point of Initiation Method = "11")
+ * Campos principais:
+ * 00=01, 01=11, 26(MAI: 00 GUI, 01 CHAVE), 52, 53, [54], 58, 59, 60, 62(05=TXID), 63(CRC)
+ */
 function gerarPixPayload({ chave, nome, cidade, identificador, valor }) {
-  const gui =
-    formatEMV("00", "01") +
-    formatEMV("01", "11") +
-    formatEMV("25", "BR.GOV.BCB.PIX");
-  const chavePix = formatEMV("01", chave);
-  const merchantAccount = formatEMV("26", gui + chavePix);
-  const merchantCategory = formatEMV("52", "0000");
-  const moeda = formatEMV("53", "986");
-  const valorFormatado = formatEMV("54", valor.toFixed(2));
-  const pais = formatEMV("58", "BR");
-  const nomeBenef = formatEMV("59", nome);
-  const cidadeBenef = formatEMV("60", cidade);
-  const txid = formatEMV("05", identificador);
-  const adicionais = formatEMV("62", txid);
+  const nomeSan = sanitize(nome).slice(0, 25) || "NAO INFORMADO";
+  const cidadeSan = sanitize(cidade).slice(0, 15) || "CIDADE";
+  const txid =
+    (identificador || "TXID").replace(/[^A-Za-z0-9]/g, "").slice(0, 25) ||
+    "TXID";
 
+  // Merchant Account Information (ID 26)
+  const mai =
+    formatEMV("00", "BR.GOV.BCB.PIX") + // GUI
+    formatEMV("01", String(chave)); // Chave PIX (CPF neste caso)
+
+  // Montagem do payload
   let payload =
-    formatEMV("00", "01") +
-    formatEMV("01", "12") +
-    merchantAccount +
-    merchantCategory +
-    moeda +
-    valorFormatado +
-    pais +
-    nomeBenef +
-    cidadeBenef +
-    adicionais +
-    "6304";
+    formatEMV("00", "01") + // Payload Format Indicator
+    formatEMV("01", "11") + // Static
+    formatEMV("26", mai) + // Merchant Account Info
+    formatEMV("52", "0000") + // Merchant Category Code
+    formatEMV("53", "986"); // Moeda (BRL)
 
+  // Valor: só inclui se > 0; se 0/ausente, omite para permitir digitação no app
+  if (valor && valor > 0) {
+    payload += formatEMV("54", Number(valor).toFixed(2));
+  }
+
+  payload +=
+    formatEMV("58", "BR") + // País
+    formatEMV("59", nomeSan) + // Nome recebedor (<=25)
+    formatEMV("60", cidadeSan) + // Cidade (<=15)
+    formatEMV("62", formatEMV("05", txid)) + // Additional Data Template / TXID
+    "6304"; // CRC placeholder
+
+  // Apende CRC calculado
   return payload + crc16(payload);
 }
+
+/* ================== Componente ================== */
 
 export default function Milhar() {
   const [milhares, setMilhares] = useState(["", "", "", ""]);
@@ -85,9 +105,7 @@ export default function Milhar() {
   const ativarModoManual = () => {
     setMilhares(["", "", "", ""]);
     setModoManual(true);
-    setTimeout(() => {
-      if (inputsRef[0].current) inputsRef[0].current.focus();
-    }, 0);
+    setTimeout(() => inputsRef[0].current?.focus(), 0);
   };
 
   const atualizarMilhar = (valor, index) => {
@@ -97,14 +115,14 @@ export default function Milhar() {
     setMilhares(novas);
 
     if (valor.length === 4 && index < inputsRef.length - 1) {
-      inputsRef[index + 1].current.focus();
+      inputsRef[index + 1].current?.focus();
     }
 
     const todasPreenchidas = novas.every((m) => m.length === 4);
     if (todasPreenchidas && !novas.some((m) => vendidas.includes(m))) {
       setBilhetes((prev) => [...prev, { numeros: novas, tipo: "manual" }]);
       setMilhares(["", "", "", ""]);
-      if (inputsRef[0].current) inputsRef[0].current.focus();
+      inputsRef[0].current?.focus();
     }
   };
 
@@ -114,25 +132,29 @@ export default function Milhar() {
     }
   };
 
+  const total = bilhetes.length * 2; // R$2 por bilhete
+
   const realizarPagamento = () => {
-    const total = 0.0; // 🔒 valor fixo só pra teste
+    // Gera TXID curto e único
+    const txid = "SD" + Date.now().toString().slice(-10);
+
     const payload = gerarPixPayload({
-      chave: "11999999999", // 🔑 sua chave Pix aqui
-      nome: "SORTEIO DIA",
-      cidade: "SAO PAULO",
-      identificador: "TX12345",
-      valor: total,
+      chave: "44954379687", // ✅ sua chave CPF
+      nome: "SorteioDoDia",
+      cidade: "Aguas Lindas de Goias", // será sanitizado e truncado
+      identificador: txid,
+      valor: total > 0 ? total : undefined, // se 0, omite 54 (usuário digita)
     });
+
     setPixPayload(payload);
     setPagamento(true);
   };
 
   const copiarCodigo = () => {
+    if (!pixPayload) return;
     navigator.clipboard.writeText(pixPayload);
     alert("✅ Código Pix copiado!");
   };
-
-  const total = bilhetes.length * 2;
 
   return (
     <div style={styles.container}>
@@ -183,15 +205,25 @@ export default function Milhar() {
           {bilhetes.map((b, i) => (
             <div key={i} style={styles.bilheteCard}>
               <span>{b.numeros.join(" - ")}</span>
-              <span>{b.tipo}</span>
+              <span style={{ fontStyle: "italic", color: "#555" }}>
+                {b.tipo}
+              </span>
               <strong>R$ 2,00</strong>
-              <button onClick={() => removerBilhete(i)}>🗑️</button>
+              <button onClick={() => removerBilhete(i)} style={styles.trashBtn}>
+                🗑️
+              </button>
             </div>
           ))}
           <h3>Total: R$ {total.toFixed(2)}</h3>
           <button
             onClick={realizarPagamento}
-            style={styles.button}
+            style={{
+              ...styles.button,
+              backgroundColor: bilhetes.length > 0 ? "#2196f3" : "#aaa",
+              cursor: bilhetes.length > 0 ? "pointer" : "not-allowed",
+              marginTop: "1rem",
+              width: "100%",
+            }}
             disabled={bilhetes.length === 0}
           >
             💳 Realizar Pagamento
@@ -199,11 +231,11 @@ export default function Milhar() {
         </div>
       )}
 
-      {/* MODAL DE PAGAMENTO */}
+      {/* ===== Modal de Pagamento ===== */}
       {pagamento && (
         <div style={styles.overlay}>
           <div style={styles.popup}>
-            {/* Cabeçalho */}
+            {/* Ícone + título + texto (com animação simples) */}
             <div style={styles.header}>
               <div style={styles.iconCircle}>
                 <span className="checkmark">✔</span>
@@ -216,19 +248,18 @@ export default function Milhar() {
             </div>
 
             {/* QR Code */}
-            <div style={{ margin: "2rem 0" }}>
-              <QRCodeSVG value={pixPayload} size={220} />
+            <div style={{ margin: "1.5rem 0" }}>
+              <QRCodeSVG value={pixPayload} size={220} includeMargin />
             </div>
 
-            {/* Apenas o botão de copiar */}
+            {/* Botão copiar (sem textarea) */}
             <button onClick={copiarCodigo} style={styles.copyButton}>
               📋 Copiar código Pix
             </button>
 
-            {/* Fechar */}
             <button
               onClick={() => setPagamento(false)}
-              style={{ ...styles.button, marginTop: "1.5rem", width: "100%" }}
+              style={{ ...styles.button, marginTop: "1.2rem", width: "100%" }}
             >
               Fechar
             </button>
@@ -236,7 +267,7 @@ export default function Milhar() {
         </div>
       )}
 
-      {/* Animação CSS inline */}
+      {/* CSS da animação do check */}
       <style>
         {`
           .checkmark {
@@ -247,10 +278,7 @@ export default function Milhar() {
             animation: popIn 0.6s ease forwards;
           }
           @keyframes popIn {
-            to {
-              opacity: 1;
-              transform: scale(1);
-            }
+            to { opacity: 1; transform: scale(1); }
           }
         `}
       </style>
@@ -258,63 +286,108 @@ export default function Milhar() {
   );
 }
 
+/* ================== Estilos ================== */
+
 const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     padding: "2rem",
+    minHeight: "100vh",
+    backgroundColor: "#f0f2f5",
+    textAlign: "center",
   },
-  voltarButton: { marginBottom: "1rem" },
+  voltarButton: {
+    marginBottom: "1rem",
+    padding: "0.7rem 1.5rem",
+    fontSize: "1rem",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#9e9e9e",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "1rem",
     margin: "2rem 0",
+    alignItems: "center",
+    justifyItems: "center",
   },
-  input: { width: "100px", fontSize: "1.5rem", textAlign: "center" },
-  trevoBox: { gridColumn: "span 2", textAlign: "center" },
-  trevo: { width: "100px" },
-  actions: { display: "flex", gap: "1rem" },
+  input: {
+    width: "110px",
+    padding: "0.7rem",
+    fontSize: "1.4rem",
+    textAlign: "center",
+    borderRadius: "8px",
+    border: "2px solid #4caf50",
+    backgroundColor: "#fff",
+    fontWeight: "bold",
+  },
+  trevoBox: { gridColumn: "span 2", display: "flex", justifyContent: "center" },
+  trevo: { width: "100px", margin: "1rem 0" },
+  actions: {
+    display: "flex",
+    gap: "1rem",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
   button: {
     padding: "0.7rem 1.5rem",
-    fontSize: "1rem",
+    fontSize: "1.1rem",
+    borderRadius: "10px",
+    border: "none",
+    backgroundColor: "#4caf50",
+    color: "#fff",
     cursor: "pointer",
-    borderRadius: "8px",
+    fontWeight: "bold",
+    transition: "0.2s",
   },
   bilhetesBox: {
     marginTop: "2rem",
-    padding: "1rem",
+    padding: "1.5rem",
     background: "#fff",
-    borderRadius: "12px",
-    boxShadow: "0px 2px 8px rgba(0,0,0,0.1)",
+    borderRadius: "16px",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+    width: "100%",
+    maxWidth: "520px",
   },
   bilheteCard: {
-    display: "flex",
-    gap: "1rem",
-    justifyContent: "space-between",
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto auto",
+    alignItems: "center",
+    gap: "0.8rem",
+    padding: "0.8rem 0",
+    borderBottom: "1px solid #eee",
+  },
+  trashBtn: {
+    background: "transparent",
+    border: "none",
+    fontSize: "1.3rem",
+    cursor: "pointer",
   },
   overlay: {
     position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    inset: 0,
     background: "rgba(0,0,0,0.6)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 9999,
+    padding: "1rem",
   },
   popup: {
     background: "#fff",
     padding: "2rem",
     borderRadius: "16px",
     textAlign: "center",
-    width: "400px",
-    boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
+    width: "min(420px, 100%)",
+    boxShadow: "0 6px 15px rgba(0,0,0,0.25)",
   },
-  header: { marginBottom: "1rem" },
+  header: { marginBottom: "0.5rem" },
   iconCircle: {
     width: "70px",
     height: "70px",
@@ -329,7 +402,6 @@ const styles = {
   title: { margin: "0.5rem 0", fontSize: "1.5rem", color: "#333" },
   subtitle: { fontSize: "0.95rem", color: "#666" },
   copyButton: {
-    marginTop: "1rem",
     padding: "0.7rem 1rem",
     background: "black",
     color: "white",
