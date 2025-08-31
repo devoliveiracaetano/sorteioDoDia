@@ -36,11 +36,6 @@ function crc16(payload) {
   return crc.toString(16).toUpperCase().padStart(4, "0");
 }
 
-/**
- * Gera payload Pix ESTÁTICO (Point of Initiation Method = "11")
- * Campos principais:
- * 00=01, 01=11, 26(MAI: 00 GUI, 01 CHAVE), 52, 53, [54], 58, 59, 60, 62(05=TXID), 63(CRC)
- */
 function gerarPixPayload({ chave, nome, cidade, identificador, valor }) {
   const nomeSan = sanitize(nome).slice(0, 25) || "NAO INFORMADO";
   const cidadeSan = sanitize(cidade).slice(0, 15) || "CIDADE";
@@ -48,32 +43,27 @@ function gerarPixPayload({ chave, nome, cidade, identificador, valor }) {
     (identificador || "TXID").replace(/[^A-Za-z0-9]/g, "").slice(0, 25) ||
     "TXID";
 
-  // Merchant Account Information (ID 26)
   const mai =
-    formatEMV("00", "BR.GOV.BCB.PIX") + // GUI
-    formatEMV("01", String(chave)); // Chave PIX (CPF neste caso)
+    formatEMV("00", "BR.GOV.BCB.PIX") + formatEMV("01", String(chave));
 
-  // Montagem do payload
   let payload =
-    formatEMV("00", "01") + // Payload Format Indicator
-    formatEMV("01", "11") + // Static
-    formatEMV("26", mai) + // Merchant Account Info
-    formatEMV("52", "0000") + // Merchant Category Code
-    formatEMV("53", "986"); // Moeda (BRL)
+    formatEMV("00", "01") +
+    formatEMV("01", "11") +
+    formatEMV("26", mai) +
+    formatEMV("52", "0000") +
+    formatEMV("53", "986");
 
-  // Valor: só inclui se > 0; se 0/ausente, omite para permitir digitação no app
   if (valor && valor > 0) {
-    payload += formatEMV("54", Number(valor).toFixed(2));
+    payload += formatEMV("54", Number(valor).toFixed(2)); // ✅ sempre com 2 casas
   }
 
   payload +=
-    formatEMV("58", "BR") + // País
-    formatEMV("59", nomeSan) + // Nome recebedor (<=25)
-    formatEMV("60", cidadeSan) + // Cidade (<=15)
-    formatEMV("62", formatEMV("05", txid)) + // Additional Data Template / TXID
-    "6304"; // CRC placeholder
+    formatEMV("58", "BR") +
+    formatEMV("59", nomeSan) +
+    formatEMV("60", cidadeSan) +
+    formatEMV("62", formatEMV("05", txid)) +
+    "6304";
 
-  // Apende CRC calculado
   return payload + crc16(payload);
 }
 
@@ -85,6 +75,8 @@ export default function Milhar() {
   const [bilhetes, setBilhetes] = useState([]);
   const [pagamento, setPagamento] = useState(false);
   const [pixPayload, setPixPayload] = useState("");
+
+  const [showMessage, setShowMessage] = useState(false); // ✅ estado da mensagem
 
   const [vendidas] = useState(["1234", "5678", "9999"]);
   const inputsRef = [useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -132,18 +124,17 @@ export default function Milhar() {
     }
   };
 
-  const total = bilhetes.length * 2; // R$2 por bilhete
+  const total = bilhetes.length * 2;
 
   const realizarPagamento = () => {
-    // Gera TXID curto e único
     const txid = "SD" + Date.now().toString().slice(-10);
 
     const payload = gerarPixPayload({
-      chave: "44954379687", // ✅ sua chave CPF
+      chave: "44954379687",
       nome: "SorteioDoDia",
-      cidade: "Aguas Lindas de Goias", // será sanitizado e truncado
+      cidade: "Aguas Lindas de Goias",
       identificador: txid,
-      valor: total > 0 ? total : undefined, // se 0, omite 54 (usuário digita)
+      valor: total > 0 ? total : undefined,
     });
 
     setPixPayload(payload);
@@ -153,7 +144,10 @@ export default function Milhar() {
   const copiarCodigo = () => {
     if (!pixPayload) return;
     navigator.clipboard.writeText(pixPayload);
-    alert("✅ Código Pix copiado!");
+
+    // ✅ mostra mensagem por 7s
+    setShowMessage(true);
+    setTimeout(() => setShowMessage(false), 7000);
   };
 
   return (
@@ -231,15 +225,26 @@ export default function Milhar() {
         </div>
       )}
 
-      {/* ===== Modal de Pagamento ===== */}
       {pagamento && (
         <div style={styles.overlay}>
           <div style={styles.popup}>
-            {/* Ícone + título + texto (com animação simples) */}
             <div style={styles.header}>
               <div style={styles.iconCircle}>
                 <span className="checkmark">✔</span>
               </div>
+
+              {/* ✅ mensagem aparece logo acima do título */}
+              {showMessage && (
+                <div style={styles.messageBox}>
+                  <strong>✅ Código Pix copiado com sucesso!</strong>
+                  <br />
+                  Abra o app do banco e use a opção <em>
+                    "Pix Copia e Cola"
+                  </em>{" "}
+                  para finalizar o pagamento.
+                </div>
+              )}
+
               <h2 style={styles.title}>Pronto para digitalizar!</h2>
               <p style={styles.subtitle}>
                 Use o código QR para prosseguir com a transação. <br />
@@ -247,12 +252,10 @@ export default function Milhar() {
               </p>
             </div>
 
-            {/* QR Code */}
             <div style={{ margin: "1.5rem 0" }}>
-              <QRCodeSVG value={pixPayload} size={220} includeMargin />
+              <QRCodeSVG value={pixPayload} size={260} includeMargin />
             </div>
 
-            {/* Botão copiar (sem textarea) */}
             <button onClick={copiarCodigo} style={styles.copyButton}>
               📋 Copiar código Pix
             </button>
@@ -267,7 +270,6 @@ export default function Milhar() {
         </div>
       )}
 
-      {/* CSS da animação do check */}
       <style>
         {`
           .checkmark {
@@ -286,7 +288,7 @@ export default function Milhar() {
   );
 }
 
-/* ================== Estilos ================== */
+/* ================== Estilos extras ================== */
 
 const styles = {
   container: {
@@ -296,6 +298,15 @@ const styles = {
     padding: "2rem",
     minHeight: "100vh",
     backgroundColor: "#f0f2f5",
+    textAlign: "center",
+  },
+  messageBox: {
+    background: "#b2f2bb", // ✅ verde claro discreto
+    color: "#033a1a",
+    padding: "0.6rem 1rem",
+    borderRadius: "8px",
+    fontSize: "0.85rem",
+    margin: "0.8rem 0", // espaçamento em cima e embaixo
     textAlign: "center",
   },
   voltarButton: {
