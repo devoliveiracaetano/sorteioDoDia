@@ -3,8 +3,8 @@ import trevoImg from "../assets/trevo.jpg";
 
 export default function Milhar() {
   const [milhares, setMilhares] = useState(["", "", "", ""]);
-  const [pagamentoGerado, setPagamentoGerado] = useState(false);
   const [modoManual, setModoManual] = useState(false);
+  const [bilhetes, setBilhetes] = useState([]); // 📌 bilhetes confirmados
 
   // 🔴 Milhares já vendidas (simulação)
   const [vendidas] = useState(["1234", "5678", "9999"]);
@@ -17,20 +17,24 @@ export default function Milhar() {
     const novas = Array.from({ length: 4 }, () =>
       String(Math.floor(Math.random() * 10000)).padStart(4, "0")
     );
-    setMilhares(novas);
-    setPagamentoGerado(true);
+
+    // adiciona bilhete como aleatório
+    setBilhetes((prev) => [...prev, { numeros: novas, tipo: "aleatório" }]);
+
+    // limpa os inputs e mantém desabilitados
+    setMilhares(["", "", "", ""]);
     setMensagem("");
     setModoManual(false);
   };
 
   const realizarPagamento = () => {
     alert("💳 Pagamento realizado com sucesso!");
+    setBilhetes([]);
   };
 
   const ativarModoManual = () => {
     setMilhares(["", "", "", ""]);
     setModoManual(true);
-    setPagamentoGerado(false);
     setMensagem("✍️ Digite suas milhares.");
     // 👉 coloca o foco no primeiro input
     setTimeout(() => {
@@ -61,16 +65,23 @@ export default function Milhar() {
     if (valor.length === 4 && index < inputsRef.length - 1) {
       inputsRef[index + 1].current.focus();
     }
+
+    // 📌 quando todas estiverem preenchidas, adiciona bilhete manual
+    const todasPreenchidas = novas.every((m) => m.length === 4);
+    if (todasPreenchidas && vendidasEncontradas.length === 0) {
+      setBilhetes((prev) => [...prev, { numeros: novas, tipo: "manual" }]);
+      setMilhares(["", "", "", ""]); // limpa os inputs p/ próximo bilhete
+      if (inputsRef[0].current) inputsRef[0].current.focus();
+    }
   };
 
-  const todasPreenchidas = milhares.every((m) => m.length === 4);
-  const algumaVendida = milhares.some((m) => vendidas.includes(m));
+  const removerBilhete = (index) => {
+    if (window.confirm("Tem certeza que deseja apagar este bilhete?")) {
+      setBilhetes((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
 
-  const pagamentoHabilitado = modoManual
-    ? todasPreenchidas && !algumaVendida
-    : pagamentoGerado;
-
-  const podeGerar = !modoManual || (modoManual && todasPreenchidas);
+  const total = bilhetes.length * 2;
 
   return (
     <div style={styles.container}>
@@ -105,24 +116,11 @@ export default function Milhar() {
           onClick={gerarMilhares}
           style={{
             ...styles.button,
-            backgroundColor: podeGerar ? "#4caf50" : "#aaa",
-            cursor: podeGerar ? "pointer" : "not-allowed",
+            backgroundColor: "#4caf50",
+            cursor: "pointer",
           }}
-          disabled={!podeGerar}
         >
           Gerar Milhares
-        </button>
-
-        <button
-          onClick={realizarPagamento}
-          style={{
-            ...styles.button,
-            backgroundColor: pagamentoHabilitado ? "#2196f3" : "#aaa",
-            cursor: pagamentoHabilitado ? "pointer" : "not-allowed",
-          }}
-          disabled={!pagamentoHabilitado}
-        >
-          Realizar Pagamento
         </button>
 
         <button
@@ -132,6 +130,48 @@ export default function Milhar() {
           ✍️ Digitar Milhares
         </button>
       </div>
+
+      {/* 🟢 Lista de bilhetes gerados */}
+      {bilhetes.length > 0 && (
+        <div style={styles.bilhetesBox}>
+          <h2>📋 Bilhetes Selecionados</h2>
+          {bilhetes.map((b, i) => (
+            <div
+              key={i}
+              style={{
+                ...styles.bilheteCard,
+                backgroundColor: b.tipo === "manual" ? "#e8f5e9" : "#e3f2fd", // cor diferente
+              }}
+            >
+              <span style={styles.bilheteNumeros}>{b.numeros.join(" - ")}</span>
+              <span style={styles.bilheteTipo}>{b.tipo}</span>
+              <strong>R$ 2,00</strong>
+              <button
+                onClick={() => removerBilhete(i)}
+                style={styles.deleteButton}
+              >
+                🗑️
+              </button>
+            </div>
+          ))}
+          <h3>Total: R$ {total.toFixed(2)}</h3>
+
+          {/* 🔵 Botão de pagamento agora no final */}
+          <button
+            onClick={realizarPagamento}
+            style={{
+              ...styles.button,
+              backgroundColor: bilhetes.length > 0 ? "#2196f3" : "#aaa",
+              cursor: bilhetes.length > 0 ? "pointer" : "not-allowed",
+              marginTop: "1rem",
+              width: "100%",
+            }}
+            disabled={bilhetes.length === 0}
+          >
+            💳 Realizar Pagamento
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -189,5 +229,38 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
     transition: "0.3s",
+  },
+  bilhetesBox: {
+    marginTop: "2rem",
+    padding: "1.5rem",
+    background: "#fff",
+    borderRadius: "16px",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+    width: "500px",
+  },
+  bilheteCard: {
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto auto",
+    alignItems: "center",
+    padding: "0.8rem 1rem",
+    borderBottom: "1px solid #ddd",
+    gap: "0.8rem",
+    fontSize: "1.2rem",
+    borderRadius: "8px",
+    marginBottom: "0.5rem",
+  },
+  bilheteNumeros: {
+    fontWeight: "bold",
+    whiteSpace: "nowrap", // garante que fica tudo em uma linha
+  },
+  bilheteTipo: {
+    fontStyle: "italic",
+    color: "#555",
+  },
+  deleteButton: {
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "1.4rem",
   },
 };
