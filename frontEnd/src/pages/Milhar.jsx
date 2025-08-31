@@ -1,37 +1,62 @@
 // src/pages/Milhar.jsx
 import { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react"; // ✅ usar versão moderna
+import { QRCodeSVG } from "qrcode.react";
 import trevoImg from "../assets/trevo.jpg";
 
-// 🔥 Função para gerar payload Pix válido
-function gerarPayloadPix({
-  chave,
-  recebedor,
-  cidade,
-  valor,
-  mensagem = "Pagamento Sorteio",
-}) {
-  const montaCampo = (id, valor) => {
-    const tamanho = valor.length.toString().padStart(2, "0");
-    return id + tamanho + valor;
-  };
+// 🔑 Função para formatar campo EMV
+function formatEMV(id, value) {
+  const length = String(value.length).padStart(2, "0");
+  return id + length + value;
+}
 
-  const gui = "BR.GOV.BCB.PIX";
+// 🔑 Cálculo CRC16 para Pix
+function crc16(payload) {
+  let polinomio = 0x1021;
+  let resultado = 0xffff;
 
-  const payload =
-    montaCampo("00", "01") +
-    montaCampo("26", montaCampo("00", gui) + montaCampo("01", chave)) +
-    montaCampo("52", "0000") +
-    montaCampo("53", "986") + // 986 = BRL
-    montaCampo("54", valor.toFixed(2)) +
-    montaCampo("58", "BR") +
-    montaCampo("59", recebedor) +
-    montaCampo("60", cidade) +
-    montaCampo("62", montaCampo("05", mensagem));
+  for (let i = 0; i < payload.length; i++) {
+    resultado ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((resultado <<= 1) & 0x10000) resultado ^= polinomio;
+      resultado &= 0xffff;
+    }
+  }
 
-  // adiciona CRC16 no final (necessário pros bancos validarem)
-  return payload + montaCampo("63", "");
+  return resultado.toString(16).toUpperCase().padStart(4, "0");
+}
+
+// 🔑 Gerador do payload Pix dinâmico
+function gerarPixPayload({ chave, nome, cidade, identificador, valor }) {
+  const gui =
+    formatEMV("00", "01") +
+    formatEMV("01", "11") +
+    formatEMV("25", "BR.GOV.BCB.PIX");
+  const chavePix = formatEMV("01", chave);
+  const merchantAccount = formatEMV("26", gui + chavePix);
+  const merchantCategory = formatEMV("52", "0000");
+  const moeda = formatEMV("53", "986");
+  const valorFormatado = formatEMV("54", valor.toFixed(2));
+  const pais = formatEMV("58", "BR");
+  const nomeBenef = formatEMV("59", nome);
+  const cidadeBenef = formatEMV("60", cidade);
+  const txid = formatEMV("05", identificador);
+  const adicionais = formatEMV("62", txid);
+
+  let payload =
+    formatEMV("00", "01") +
+    formatEMV("01", "12") +
+    merchantAccount +
+    merchantCategory +
+    moeda +
+    valorFormatado +
+    pais +
+    nomeBenef +
+    cidadeBenef +
+    adicionais +
+    "6304";
+
+  return payload + crc16(payload);
 }
 
 export default function Milhar() {
@@ -39,7 +64,7 @@ export default function Milhar() {
   const [modoManual, setModoManual] = useState(false);
   const [bilhetes, setBilhetes] = useState([]);
   const [pagamento, setPagamento] = useState(false);
-  const [mensagem, setMensagem] = useState("");
+  const [pixPayload, setPixPayload] = useState("");
 
   const [vendidas] = useState(["1234", "5678", "9999"]);
   const inputsRef = [useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -54,14 +79,12 @@ export default function Milhar() {
     );
     setBilhetes((prev) => [...prev, { numeros: novas, tipo: "aleatório" }]);
     setMilhares(["", "", "", ""]);
-    setMensagem("");
     setModoManual(false);
   };
 
   const ativarModoManual = () => {
     setMilhares(["", "", "", ""]);
     setModoManual(true);
-    setMensagem("✍️ Digite suas milhares.");
     setTimeout(() => {
       if (inputsRef[0].current) inputsRef[0].current.focus();
     }, 0);
@@ -73,22 +96,12 @@ export default function Milhar() {
     novas[index] = valor;
     setMilhares(novas);
 
-    const vendidasEncontradas = novas.filter(
-      (m) => m.length === 4 && vendidas.includes(m)
-    );
-
-    if (vendidasEncontradas.length > 0) {
-      setMensagem(`❌ Já vendidas: ${vendidasEncontradas.join(", ")}`);
-    } else {
-      setMensagem("✍️ Continue digitando suas milhares.");
-    }
-
     if (valor.length === 4 && index < inputsRef.length - 1) {
       inputsRef[index + 1].current.focus();
     }
 
     const todasPreenchidas = novas.every((m) => m.length === 4);
-    if (todasPreenchidas && vendidasEncontradas.length === 0) {
+    if (todasPreenchidas && !novas.some((m) => vendidas.includes(m))) {
       setBilhetes((prev) => [...prev, { numeros: novas, tipo: "manual" }]);
       setMilhares(["", "", "", ""]);
       if (inputsRef[0].current) inputsRef[0].current.focus();
@@ -102,23 +115,24 @@ export default function Milhar() {
   };
 
   const realizarPagamento = () => {
+    const total = 0.0; // 🔒 valor fixo só pra teste
+    const payload = gerarPixPayload({
+      chave: "11999999999", // 🔑 sua chave Pix aqui
+      nome: "SORTEIO DIA",
+      cidade: "SAO PAULO",
+      identificador: "TX12345",
+      valor: total,
+    });
+    setPixPayload(payload);
     setPagamento(true);
   };
 
-  const total = bilhetes.length * 2;
-
-  // ✅ Gera payload Pix com os dados do cliente
-  const payloadPix = gerarPayloadPix({
-    chave: "44954379687", // chave pix (coloque sua chave real aqui)
-    recebedor: "Minha Empresa LTDA",
-    cidade: "SAO PAULO",
-    valor: total || 0.01, // evitar erro se total = 0
-  });
-
   const copiarCodigo = () => {
-    navigator.clipboard.writeText(payloadPix);
+    navigator.clipboard.writeText(pixPayload);
     alert("✅ Código Pix copiado!");
   };
+
+  const total = bilhetes.length * 2;
 
   return (
     <div style={styles.container}>
@@ -131,7 +145,6 @@ export default function Milhar() {
         ⬅️ Voltar para o Menu
       </button>
 
-      {/* Inputs das milhares */}
       <div style={styles.grid}>
         {milhares.map((milhar, i) => (
           <input
@@ -141,20 +154,13 @@ export default function Milhar() {
             value={milhar}
             disabled={!modoManual}
             onChange={(e) => atualizarMilhar(e.target.value, i)}
-            style={{
-              ...styles.input,
-              borderColor: vendidas.includes(milhar) ? "red" : "#4caf50",
-              color: vendidas.includes(milhar) ? "red" : "black",
-            }}
+            style={styles.input}
           />
         ))}
-
         <div style={styles.trevoBox}>
           <img src={trevoImg} alt="Trevo" style={styles.trevo} />
         </div>
       </div>
-
-      {mensagem && <p style={{ fontWeight: "bold" }}>{mensagem}</p>}
 
       <div style={styles.actions}>
         <button
@@ -163,7 +169,6 @@ export default function Milhar() {
         >
           Gerar Milhares
         </button>
-
         <button
           onClick={ativarModoManual}
           style={{ ...styles.button, backgroundColor: "#ff9800" }}
@@ -172,40 +177,21 @@ export default function Milhar() {
         </button>
       </div>
 
-      {/* Lista de bilhetes */}
       {bilhetes.length > 0 && (
         <div style={styles.bilhetesBox}>
           <h2>📋 Bilhetes Selecionados</h2>
           {bilhetes.map((b, i) => (
-            <div
-              key={i}
-              style={{
-                ...styles.bilheteCard,
-                backgroundColor: b.tipo === "manual" ? "#e8f5e9" : "#e3f2fd",
-              }}
-            >
-              <span style={styles.bilheteNumeros}>{b.numeros.join(" - ")}</span>
-              <span style={styles.bilheteTipo}>{b.tipo}</span>
-              <strong style={styles.preco}>R$ 2,00</strong>
-              <button
-                onClick={() => removerBilhete(i)}
-                style={styles.deleteButton}
-              >
-                🗑️
-              </button>
+            <div key={i} style={styles.bilheteCard}>
+              <span>{b.numeros.join(" - ")}</span>
+              <span>{b.tipo}</span>
+              <strong>R$ 2,00</strong>
+              <button onClick={() => removerBilhete(i)}>🗑️</button>
             </div>
           ))}
           <h3>Total: R$ {total.toFixed(2)}</h3>
-
           <button
             onClick={realizarPagamento}
-            style={{
-              ...styles.button,
-              backgroundColor: bilhetes.length > 0 ? "#2196f3" : "#aaa",
-              cursor: bilhetes.length > 0 ? "pointer" : "not-allowed",
-              marginTop: "1rem",
-              width: "100%",
-            }}
+            style={styles.button}
             disabled={bilhetes.length === 0}
           >
             💳 Realizar Pagamento
@@ -213,33 +199,61 @@ export default function Milhar() {
         </div>
       )}
 
-      {/* ✅ POPUP de Pagamento */}
+      {/* MODAL DE PAGAMENTO */}
       {pagamento && (
         <div style={styles.overlay}>
           <div style={styles.popup}>
-            <div style={styles.iconCheck}>✔️</div>
-            <h2 style={{ color: "green" }}>Pronto para pagar via Pix!</h2>
-            <p>
-              Escaneie o QR Code ou copie o código Pix para concluir a
-              transação.
-            </p>
+            {/* Cabeçalho */}
+            <div style={styles.header}>
+              <div style={styles.iconCircle}>
+                <span className="checkmark">✔</span>
+              </div>
+              <h2 style={styles.title}>Pronto para digitalizar!</h2>
+              <p style={styles.subtitle}>
+                Use o código QR para prosseguir com a transação. <br />
+                Quando a transação for concluída, você receberá uma notificação.
+              </p>
+            </div>
 
-            {/* QR Code Pix válido */}
-            <QRCodeSVG value={payloadPix} size={180} />
+            {/* QR Code */}
+            <div style={{ margin: "2rem 0" }}>
+              <QRCodeSVG value={pixPayload} size={220} />
+            </div>
 
+            {/* Apenas o botão de copiar */}
             <button onClick={copiarCodigo} style={styles.copyButton}>
               📋 Copiar código Pix
             </button>
 
+            {/* Fechar */}
             <button
               onClick={() => setPagamento(false)}
-              style={{ ...styles.button, marginTop: "1rem", width: "100%" }}
+              style={{ ...styles.button, marginTop: "1.5rem", width: "100%" }}
             >
               Fechar
             </button>
           </div>
         </div>
       )}
+
+      {/* Animação CSS inline */}
+      <style>
+        {`
+          .checkmark {
+            display: inline-block;
+            font-size: 2rem;
+            opacity: 0;
+            transform: scale(0.5);
+            animation: popIn 0.6s ease forwards;
+          }
+          @keyframes popIn {
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
@@ -249,97 +263,36 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    minHeight: "100vh",
-    backgroundColor: "#f0f2f5",
     padding: "2rem",
-    textAlign: "center",
   },
-  voltarButton: {
-    marginBottom: "1rem",
-    padding: "0.7rem 1.5rem",
-    fontSize: "1rem",
-    borderRadius: "8px",
-    border: "none",
-    backgroundColor: "#9e9e9e",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
+  voltarButton: { marginBottom: "1rem" },
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "1rem",
-    alignItems: "center",
-    justifyItems: "center",
     margin: "2rem 0",
   },
-  input: {
-    width: "120px",
-    padding: "0.7rem",
-    fontSize: "1.5rem",
-    textAlign: "center",
-    borderRadius: "8px",
-    border: "2px solid #4caf50",
-    backgroundColor: "#fff",
-    fontWeight: "bold",
-  },
-  trevoBox: { gridColumn: "span 2", display: "flex", justifyContent: "center" },
-  trevo: { width: "100px", margin: "1rem 0" },
-  actions: {
-    display: "flex",
-    gap: "1rem",
-    marginTop: "1rem",
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
+  input: { width: "100px", fontSize: "1.5rem", textAlign: "center" },
+  trevoBox: { gridColumn: "span 2", textAlign: "center" },
+  trevo: { width: "100px" },
+  actions: { display: "flex", gap: "1rem" },
   button: {
     padding: "0.7rem 1.5rem",
-    fontSize: "1.2rem",
-    borderRadius: "8px",
-    border: "none",
-    backgroundColor: "#4caf50",
-    color: "#fff",
+    fontSize: "1rem",
     cursor: "pointer",
-    fontWeight: "bold",
+    borderRadius: "8px",
   },
   bilhetesBox: {
     marginTop: "2rem",
-    padding: "1.5rem",
+    padding: "1rem",
     background: "#fff",
-    borderRadius: "16px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-    width: "100%",
-    maxWidth: "500px",
+    borderRadius: "12px",
+    boxShadow: "0px 2px 8px rgba(0,0,0,0.1)",
   },
   bilheteCard: {
     display: "flex",
-    alignItems: "center",
+    gap: "1rem",
     justifyContent: "space-between",
-    padding: "0.8rem 1rem",
-    borderBottom: "1px solid #ddd",
-    gap: "0.8rem",
-    borderRadius: "8px",
-    marginBottom: "0.5rem",
-  },
-  bilheteNumeros: {
-    fontWeight: "bold",
-    fontSize: "1.1rem",
-    flexGrow: 1,
-    textAlign: "left",
-  },
-  bilheteTipo: {
-    fontStyle: "italic",
-    color: "#555",
-    minWidth: "70px",
-    textAlign: "center",
-  },
-  preco: { fontWeight: "bold", flexShrink: 0 },
-  deleteButton: {
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "1.4rem",
-    flexShrink: 0,
   },
   overlay: {
     position: "fixed",
@@ -351,24 +304,38 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 9999,
   },
   popup: {
     background: "#fff",
     padding: "2rem",
     borderRadius: "16px",
-    maxWidth: "400px",
-    width: "90%",
     textAlign: "center",
-    boxShadow: "0 6px 15px rgba(0,0,0,0.25)",
+    width: "400px",
+    boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
   },
-  iconCheck: { fontSize: "2rem", color: "green", marginBottom: "1rem" },
+  header: { marginBottom: "1rem" },
+  iconCircle: {
+    width: "70px",
+    height: "70px",
+    borderRadius: "50%",
+    backgroundColor: "#4caf50",
+    color: "white",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    margin: "0 auto 1rem",
+  },
+  title: { margin: "0.5rem 0", fontSize: "1.5rem", color: "#333" },
+  subtitle: { fontSize: "0.95rem", color: "#666" },
   copyButton: {
-    backgroundColor: "#000",
-    color: "#fff",
-    padding: "0.6rem 1.2rem",
-    borderRadius: "6px",
-    border: "none",
-    cursor: "pointer",
     marginTop: "1rem",
+    padding: "0.7rem 1rem",
+    background: "black",
+    color: "white",
+    fontSize: "1rem",
+    borderRadius: "8px",
+    cursor: "pointer",
+    width: "100%",
   },
 };
