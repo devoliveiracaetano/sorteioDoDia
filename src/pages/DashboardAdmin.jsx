@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+// src/pages/DashboardAdmin.jsx
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -15,6 +16,8 @@ import { FaUserCircle } from "react-icons/fa";
 
 export default function DashboardAdmin() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const role = location.state?.role || "admin";
 
   // 🔹 Lista com 10 vendedores
   const vendedores = [
@@ -52,10 +55,18 @@ export default function DashboardAdmin() {
       <h1>📊 Dashboard do Administrador</h1>
 
       <div>
-        <button onClick={() => navigate("/")} style={styles.buttonSecundario}>
-          ⬅️ Voltar para Login
+        {/* 🔹 Agora volta para o Menu com role admin */}
+        <button
+          onClick={() => navigate("/menu", { state: { role } })}
+          style={styles.buttonSecundario}
+        >
+          ⬅️ Voltar para Menu
         </button>
-        <button onClick={() => navigate("/milhar")} style={styles.button}>
+
+        <button
+          onClick={() => navigate("/milhar", { state: { role } })}
+          style={styles.button}
+        >
           🍀 Ir para Gerador de Milhar
         </button>
       </div>
@@ -137,7 +148,9 @@ export default function DashboardAdmin() {
               </td>
               <td>
                 <button
-                  onClick={() => navigate(`/dashboard/vendedor/${v.id}`)}
+                  onClick={() =>
+                    navigate(`/dashboard/vendedor/${v.id}`, { state: { role } })
+                  }
                   style={styles.iconButton}
                 >
                   <FaUserCircle size={20} />

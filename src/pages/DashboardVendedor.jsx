@@ -1,5 +1,6 @@
+// src/pages/DashboardVendedor.jsx
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -15,6 +16,8 @@ import {
 export default function DashboardVendedor() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
+  const role = location.state?.role || "vendedor";
 
   // 🔹 10 vendedores fictícios
   const vendedores = {
@@ -32,7 +35,7 @@ export default function DashboardVendedor() {
 
   const nomeVendedor = vendedores[id] || "Vendedor Desconhecido";
 
-  // 🔹 Mais vendas fictícias
+  // 🔹 Vendas fictícias
   const [vendas] = useState([
     { cliente: "Maria", qtd: 8, valor: 16, data: "28/08/2025" },
     { cliente: "Carlos", qtd: 12, valor: 24, data: "28/08/2025" },
@@ -65,10 +68,18 @@ export default function DashboardVendedor() {
       <h1>📊 Dashboard do Vendedor {nomeVendedor}</h1>
 
       <div>
-        <button onClick={() => navigate("/")} style={styles.buttonSecundario}>
-          ⬅️ Voltar para Login
+        {/* 🔹 Agora volta para o Menu com role vendedor */}
+        <button
+          onClick={() => navigate("/menu", { state: { role } })}
+          style={styles.buttonSecundario}
+        >
+          ⬅️ Voltar para Menu
         </button>
-        <button onClick={() => navigate("/milhar")} style={styles.button}>
+
+        <button
+          onClick={() => navigate("/milhar", { state: { role } })}
+          style={styles.button}
+        >
           🍀 Ir para Gerador de Milhar
         </button>
       </div>
